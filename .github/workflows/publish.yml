@@ -118,7 +118,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-- name: Install Linux Dependencies
+      - name: Install Linux Dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
