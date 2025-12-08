@@ -185,7 +185,7 @@ jobs:
           mkdir output
           
           # 1. Move EXE to output
-          cp bin/mangatan/target/${{ matrix.target }}/release/mangatan.exe output/
+          cp target/${{ matrix.target }}/release/mangatan.exe output/
           
           # 2. Download and Extract Mesa 3D
           echo "Fetching latest Mesa version..."
@@ -223,7 +223,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          BINARY_PATH="bin/mangatan/target/${{ matrix.target }}/release/mangatan"
+          BINARY_PATH="target/${{ matrix.target }}/release/mangatan"
           ICON_PATH="bin/mangatan/resources/faviconlogo.png"
           VERSION="${{ github.ref_name }}"
           CLEAN_VERSION=$(echo $VERSION | sed 's/^v//')
@@ -285,7 +285,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          BINARY_PATH="bin/mangatan/target/${{ matrix.target }}/release/mangatan"
+          BINARY_PATH="target/${{ matrix.target }}/release/mangatan"
           ICON_PATH="bin/mangatan/resources/faviconlogo.png"
           APP_NAME="Mangatan"
           BUNDLE_DIR="${APP_NAME}.app"
