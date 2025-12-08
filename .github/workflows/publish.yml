@@ -184,37 +184,37 @@ jobs:
         run: |
           mkdir output
           
-          # 1. Move EXE to output
+          # 1. Copy the Main Executable
+          # Ensure this path matches where Cargo outputs the file (root target vs bin target)
           cp target/${{ matrix.target }}/release/mangatan.exe output/
           
-          # 2. Download and Extract Mesa 3D
+          # 2. Download Mesa 3D (CORRECTED URL)
           echo "Fetching latest Mesa version..."
           MESA_TAG=$(curl -s https://api.github.com/repos/pal1000/mesa-dist-win/releases/latest | jq -r .tag_name)
           echo "Detected Mesa version: $MESA_TAG"
           
-          curl -L -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/${MESA_TAG}/mesa3d-windows-${MESA_TAG}.7z"
+          # FIX: The asset name is 'mesa3d-VERSION-release-msvc.7z'
+          curl -L -o mesa.7z "https://github.com/pal1000/mesa-dist-win/releases/download/${MESA_TAG}/mesa3d-${MESA_TAG}-release-msvc.7z"
           
-          # Extract using 7z (Standard on Windows Actions)
+          # 3. Extract Mesa
           7z x mesa.7z -omesa_dist
           
-          # 3. Copy required DLLs from x64 folder
+          # 4. Copy the required DLLs
           echo "Copying Mesa DLLs..."
           cp mesa_dist/x64/opengl32.dll output/
           cp mesa_dist/x64/libgallium_wgl.dll output/
           
-          # Try to copy d3d10warp.dll if it exists (it's not always in the pack, but requested)
+          # Optional: d3d10warp.dll (Software Rasterizer)
           if [ -f "mesa_dist/x64/d3d10warp.dll" ]; then
              cp mesa_dist/x64/d3d10warp.dll output/
-          else
-             echo "Warning: d3d10warp.dll not found in Mesa package. Skipping."
           fi
           
-          # 4. Zip the folder contents
+          # 5. Zip everything together
           cd output
           7z a -tzip ../mangatan-windows-x64.zip *
           cd ..
           
-          # Prepare artifact path for upload
+          # 6. Prepare for Upload
           mkdir final_artifact
           mv mangatan-windows-x64.zip final_artifact/
 
