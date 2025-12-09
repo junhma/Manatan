@@ -31,23 +31,23 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
-const ICON_BYTES: &[u8] = include_bytes!("../resources/faviconlogo.png");
-const JAR_BYTES: &[u8] = include_bytes!("../resources/Suwayomi-Server.jar");
+static ICON_BYTES: &[u8] = include_bytes!("../resources/faviconlogo.png");
+static JAR_BYTES: &[u8] = include_bytes!("../resources/Suwayomi-Server.jar");
 
 #[cfg(feature = "embed-jre")]
-const JRE_BYTES: &[u8] = include_bytes!("../resources/jre_bundle.zip");
+static JRE_BYTES: &[u8] = include_bytes!("../resources/jre_bundle.zip");
 
 #[cfg(target_os = "windows")]
-const OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-win.exe");
+static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-win.exe");
 
 #[cfg(target_os = "linux")]
-const OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-linux");
+static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-linux");
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-const OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-macos-arm64");
+static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-macos-arm64");
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-const OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-macos-x64");
+static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-macos-x64");
 
 #[derive(RustEmbed)]
 #[folder = "resources/suwayomi-webui"]

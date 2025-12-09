@@ -142,7 +142,7 @@ vite.config.ts.timestamp-*
 */ocr-cache.json
 */uploads
 
-bin/mangatan/resources/suwayomi-webui
+bin/mangatan/resources/suwayomi-webui*
 bin/mangatan/resources/ocr-server*
 bin/mangatan/resources/Suwayomi-Server.jar
 bin/mangatan/resources/jre_bundle.zip
