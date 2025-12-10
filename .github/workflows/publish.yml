@@ -41,6 +41,8 @@ jobs:
         include:
           - os: ubuntu-latest
             name: linux-x64
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
           - os: windows-latest
             name: windows-x64
           - os: macos-15
@@ -66,7 +68,7 @@ jobs:
           name: ${{ matrix.name }}-jre
           path: jre_bundle
 
-  # --- JOB 3: Build WebUI
+  # --- JOB 3: Build WebUI ---
   build_webui:
     name: Build WebUI
     runs-on: ubuntu-latest
@@ -75,20 +77,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
       - name: Set up NodeJs
         uses: actions/setup-node@v4
         with:
           node-version-file: 'Suwayomi-WebUI/package.json'
           cache: 'yarn'
           cache-dependency-path: 'Suwayomi-WebUI/yarn.lock'
-
       - name: Build WebUI Assets
         run: |
           cd Suwayomi-WebUI
           yarn install --frozen-lockfile
           yarn build
-
       - name: Upload WebUI Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -104,13 +103,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # --- LINUX x64 ---
           - name: Linux-x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             arch_name: linux-x64
             ocr_binary: ocr-server-linux
             jogamp_target: linux-amd64
+
+          # --- LINUX ARM64 ---
+          - name: Linux-arm64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            arch_name: linux-arm64
+            ocr_binary: ocr-server-linux-arm64
+            jogamp_target: linux-aarch64
             
+          # --- WINDOWS ---
           - name: Windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
@@ -118,6 +127,7 @@ jobs:
             ocr_binary: ocr-server-win.exe
             jogamp_target: windows-amd64
             
+          # --- MACOS ---
           - name: macOS-Intel
             os: macos-15-intel
             target: x86_64-apple-darwin
@@ -136,6 +146,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # --- LINUX DEPENDENCIES (Runs on both x64 and ARM64 now) ---
       - name: Install Linux Dependencies
         if: runner.os == 'Linux'
         run: |
@@ -169,23 +180,23 @@ jobs:
       - name: Prepare JogAmp Natives
         shell: bash
         run: |
-          # Download JogAmp
           curl -L "https://jogamp.org/deployment/jogamp-current/archive/jogamp-all-platforms.7z" -o jogamp.7z
           
-          # Extract specific folder using 7z
-          # The structure inside the 7z is jogamp-all-platforms/lib/<target>
+          # Extract the specific target folder
           7z x jogamp.7z "jogamp-all-platforms/lib/${{ matrix.jogamp_target }}"
           
-          # Move files to a clean folder to be zipped
           mkdir natives_temp
-          mv jogamp-all-platforms/lib/${{ matrix.jogamp_target }}/* natives_temp/
           
-          # Zip it up for embedding
+          # Move the entire architecture folder (e.g., 'linux-amd64') into natives_temp
+          mv jogamp-all-platforms/lib/${{ matrix.jogamp_target }} natives_temp/
+          
           cd natives_temp
+          
+          # Zip the folder itself (so the zip contains 'linux-amd64/libgluegen.so')
           if [ "${{ runner.os }}" == "Windows" ]; then
-            7z a -tzip ../bin/mangatan/resources/natives.zip *
+            7z a -tzip ../bin/mangatan/resources/natives.zip ${{ matrix.jogamp_target }}
           else
-            zip -r ../bin/mangatan/resources/natives.zip .
+            zip -r ../bin/mangatan/resources/natives.zip ${{ matrix.jogamp_target }}
           fi
 
       - name: Download JRE
@@ -214,7 +225,7 @@ jobs:
           name: webui-assets
           path: bin/mangatan/resources/suwayomi-webui
 
-      # --- COMPILATION ---
+      # --- COMPILATION (Native for everyone) ---
       - name: Build Binary
         shell: bash
         env:
@@ -230,13 +241,8 @@ jobs:
         run: |
           mkdir output
           cp target/${{ matrix.target }}/release/mangatan.exe output/
-          
-          cd output
-          7z a -tzip ../mangatan-windows-x64.zip *
-          cd ..
-          
-          mkdir final_artifact
-          mv mangatan-windows-x64.zip final_artifact/
+          cd output && 7z a -tzip ../mangatan-windows-x64.zip * && cd ..
+          mkdir final_artifact && mv mangatan-windows-x64.zip final_artifact/
 
       # --- LINUX PACKAGING ---
       - name: Package Linux
@@ -247,6 +253,12 @@ jobs:
           ICON_PATH="bin/mangatan/resources/faviconlogo.png"
           VERSION="${{ github.ref_name }}"
           CLEAN_VERSION=$(echo $VERSION | sed 's/^v//')
+          
+          # Detect Arch
+          DEB_ARCH="amd64"
+          if [[ "${{ matrix.target }}" == *"aarch64"* ]]; then
+            DEB_ARCH="arm64"
+          fi
           
           mkdir -p output
           
@@ -261,7 +273,7 @@ jobs:
           Version: $CLEAN_VERSION
           Section: utils
           Priority: optional
-          Architecture: amd64
+          Architecture: $DEB_ARCH
           Maintainer: Mangatan Team
           Description: Mangatan Server
            A robust manga server application.
@@ -277,33 +289,25 @@ jobs:
           Terminal=false
           EOF
           
-          dpkg-deb --build deb_pkg output/mangatan_${CLEAN_VERSION}_amd64.deb
+          dpkg-deb --build deb_pkg output/mangatan_${CLEAN_VERSION}_${DEB_ARCH}.deb
 
           # --- 2. BUILD TAR.GZ ---
-          # Create a staging directory so the tar extracts into a folder
           mkdir -p tar_staging/mangatan-${CLEAN_VERSION}
-          
-          # Copy binary to staging
           cp "$BINARY_PATH" tar_staging/mangatan-${CLEAN_VERSION}/mangatan
           chmod +x tar_staging/mangatan-${CLEAN_VERSION}/mangatan
           
-          # Create the archive
           cd tar_staging
-          tar -czvf ../output/mangatan-linux-x64.tar.gz mangatan-${CLEAN_VERSION}
+          tar -czvf ../output/mangatan-${{ matrix.arch_name }}.tar.gz mangatan-${CLEAN_VERSION}
           cd ..
-          
-      # --- MACOS PACKAGING (SIMPLE BINARY) ---
-      - name: Package macOS (Raw Binary)
+
+      # --- MACOS PACKAGING ---
+      - name: Package macOS
         if: runner.os == 'macOS'
         shell: bash
         run: |
           mkdir output
-          # Copy the binary
           cp target/${{ matrix.target }}/release/mangatan output/
-          
-          # Zip it
-          cd output
-          zip mangatan-macos.zip mangatan
+          cd output && zip mangatan-macos.zip mangatan
 
       # --- UPLOAD ARTIFACTS ---
       - name: Upload Windows Artifact
@@ -338,11 +342,17 @@ jobs:
         with:
           fetch-depth: 0  
 
-      - name: Download Linux
+      - name: Download Linux x64
         uses: actions/download-artifact@v4
         with:
           name: mangatan-linux-x64
-          path: release/linux
+          path: release/linux-x64
+
+      - name: Download Linux ARM64
+        uses: actions/download-artifact@v4
+        with:
+          name: mangatan-linux-arm64
+          path: release/linux-arm64
           
       - name: Download Windows
         uses: actions/download-artifact@v4
@@ -367,12 +377,16 @@ jobs:
           mkdir final_release
           VERSION=${{ github.ref_name }}
           
-          # WINDOWS (Zip)
+          # WINDOWS
           mv release/windows/mangatan-windows-x64.zip final_release/Mangatan-${VERSION}-Windows-x64.zip
           
-          # LINUX
-          mv release/linux/*.deb final_release/Mangatan-${VERSION}-Linux-x64.deb
-          mv release/linux/*.tar.gz final_release/Mangatan-${VERSION}-Linux-x64.tar.gz
+          # LINUX x64
+          mv release/linux-x64/*.deb final_release/Mangatan-${VERSION}-Linux-x64.deb
+          mv release/linux-x64/*.tar.gz final_release/Mangatan-${VERSION}-Linux-x64.tar.gz
+
+          # LINUX ARM64
+          mv release/linux-arm64/*.deb final_release/Mangatan-${VERSION}-Linux-arm64.deb
+          mv release/linux-arm64/*.tar.gz final_release/Mangatan-${VERSION}-Linux-arm64.tar.gz
           
           # MACOS
           mv release/mac-intel/mangatan-macos.zip final_release/Mangatan-${VERSION}-macOS-Intel.zip
@@ -385,26 +399,16 @@ jobs:
         id: release_notes
         run: |
           CURRENT_TAG=${{ github.ref_name }}
-          echo "Generating release notes for $CURRENT_TAG"
-          
-          # Find the tag before this one
           PREV_TAG=$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || true)
-          
-          # Start writing the file
           echo "## Release $CURRENT_TAG" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          
           if [ -z "$PREV_TAG" ]; then
             echo "### Initial Release" >> RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
             git log --no-merges --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
           else
             echo "### Changes since $PREV_TAG" >> RELEASE_NOTES.md
-            echo "" >> RELEASE_NOTES.md
             git log "$PREV_TAG..$CURRENT_TAG" --no-merges --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
           fi
-          
-          cat RELEASE_NOTES.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

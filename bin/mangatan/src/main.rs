@@ -43,7 +43,10 @@ static JRE_BYTES: &[u8] = include_bytes!("../resources/jre_bundle.zip");
 #[cfg(target_os = "windows")]
 static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-win.exe");
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-linux-arm64");
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 static OCR_BYTES: &[u8] = include_bytes!("../resources/ocr-server-linux");
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
@@ -272,6 +275,7 @@ async fn run_server(
 
     info!("☕ Spawning Suwayomi...");
     let mut suwayomi_proc = Command::new(&java_exec)
+        .current_dir(data_dir)
         .arg("-Dsuwayomi.tachidesk.config.server.initialOpenInBrowserEnabled=false")
         .arg("-Dsuwayomi.tachidesk.config.server.webUIChannel=BUNDLED")
         .arg("-XX:+ExitOnOutOfMemoryError")

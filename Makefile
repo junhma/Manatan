@@ -1,15 +1,20 @@
 SHELL := /bin/bash
 
 UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
 JOGAMP_TARGET := unknown
 
 ifeq ($(UNAME_S),Linux)
     JOGAMP_TARGET := linux-amd64
+    ifneq (,$(filter aarch64 arm64,$(UNAME_M)))
+        JOGAMP_TARGET := linux-aarch64
+    endif
 endif
+
 ifeq ($(UNAME_S),Darwin)
     JOGAMP_TARGET := macosx-universal
 endif
-# Check for Windows (MingW/MSYS/Cygwin or standard Env var)
+
 ifneq (,$(findstring MINGW,$(UNAME_S)))
     JOGAMP_TARGET := windows-amd64
 endif
@@ -41,8 +46,9 @@ clean: # Run `clean mangatan resources`.
 	rm -rf bin/mangatan/resources/jre_bundle.zip
 	rm -rf bin/mangatan/resources/ocr-server*
 	rm -rf bin/mangatan/resources/Suwayomi-Server.jar
+	rm -rf bin/mangatan/resources/natives.zip
 	rm -f jogamp.7z
-	rm -rf temp_natives	
+	rm -rf temp_natives 
 
 .PHONY: clean_rust
 clean_rust: # Run `cargo clean`.
@@ -79,19 +85,16 @@ build_webui:
 .PHONY: build-ocr-binaries
 build-ocr-binaries:
 	@echo "Building OCR binaries..."
-
 	cd ocr-server && mkdir -p dist
-	      
 	# Linux x64
 	cd ocr-server && deno compile --allow-net --allow-read --allow-write --allow-env --target x86_64-unknown-linux-gnu --output dist/ocr-server-linux server.ts
-	
+	# Linux ARM64
+	cd ocr-server && deno compile --allow-net --allow-read --allow-write --allow-env --target aarch64-unknown-linux-gnu --output dist/ocr-server-linux-arm64 server.ts
 	# Windows x64
 	cd ocr-server && deno compile --allow-net --allow-read --allow-write --allow-env --target x86_64-pc-windows-msvc --output dist/ocr-server-win.exe server.ts
-	
 	# macOS x64 (Intel)
 	cd ocr-server && deno compile --allow-net --allow-read --allow-write --allow-env --target x86_64-apple-darwin --output dist/ocr-server-macos-x64 server.ts
-	
-	# macOS ARM64 (Apple Silicon) - Optional, can fallback to x64 via Rosetta or use specific binary if needed
+	# macOS ARM64
 	cd ocr-server && deno compile --allow-net --allow-read --allow-write --allow-env --target aarch64-apple-darwin --output dist/ocr-server-macos-arm64 server.ts
 	cp ocr-server/dist/ocr-server* bin/mangatan/resources
 
@@ -99,7 +102,7 @@ build-ocr-binaries:
 download_natives:
 	@echo "Preparing JogAmp natives for target: $(JOGAMP_TARGET)"
 	@if [ "$(JOGAMP_TARGET)" = "unknown" ]; then \
-		echo "Error: Could not detect OS for JogAmp target. Please ensure you are on Linux, macOS, or Windows (MingW/Cygwin)."; \
+		echo "Error: Could not detect OS for JogAmp target."; \
 		exit 1; \
 	fi
 	mkdir -p bin/mangatan/resources
@@ -109,13 +112,14 @@ download_natives:
 	@echo "Downloading JogAmp..."
 	curl -L "https://jogamp.org/deployment/jogamp-current/archive/jogamp-all-platforms.7z" -o jogamp.7z
 	
-	@echo "Extracting $(JOGAMP_TARGET) libraries..."
-	# Requires 7z installed (p7zip-full on Linux/Mac)
+	@echo "Extracting libraries..."
+	# Extract only the specific architecture folder
 	7z x jogamp.7z -otemp_natives "jogamp-all-platforms/lib/$(JOGAMP_TARGET)"
 	
-	@echo "Zipping natives..."
-	# Zip the contents of the target folder into natives.zip
-	cd temp_natives/jogamp-all-platforms/lib/$(JOGAMP_TARGET) && zip -r ../../../../../bin/mangatan/resources/natives.zip .
+	@echo "Zipping structure..."
+	# Change directory to the parent 'lib' folder so we can zip the folder 'linux-amd64' (or similar)
+	# This ensures natives.zip contains the folder structure: <arch>/file.so
+	cd temp_natives/jogamp-all-platforms/lib && zip -r "$(CURDIR)/bin/mangatan/resources/natives.zip" $(JOGAMP_TARGET)
 	
 	@echo "Cleanup..."
 	rm jogamp.7z
@@ -125,6 +129,10 @@ download_natives:
 .PHONY: dev
 dev: build-ocr-binaries build_webui download_jar download_natives
 	cargo run --release -p mangatan
+
+.PHONY: dev-embedded
+dev-embedded: build-ocr-binaries build_webui download_jar bundle_jre download_natives
+	cargo run --release -p mangatan --features embed-jre
 
 .PHONY: jlink
 jlink:
