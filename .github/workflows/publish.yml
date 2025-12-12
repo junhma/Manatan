@@ -370,12 +370,16 @@ jobs:
           echo "## Release $CURRENT_TAG" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
           if [ -z "$PREV_TAG" ]; then
-            echo "### Initial Release" >> RELEASE_NOTES.md
             git log --no-merges --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
           else
-            echo "### Changes since $PREV_TAG" >> RELEASE_NOTES.md
             git log "$PREV_TAG..$CURRENT_TAG" --no-merges --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
           fi
+
+      - name: Load Release Notes
+        run: |
+          echo "RELEASE_BODY<<EOF" >> $GITHUB_ENV
+          cat RELEASE_NOTES.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -384,3 +388,17 @@ jobs:
           draft: true
           body_path: RELEASE_NOTES.md
           files: final_release/*
+
+      - name: Notify Discord
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        with:
+          args: |
+            🚀 **New Release Published!**
+            
+            **Version:** ${{ github.ref_name }}
+            **Download:** https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+            
+            **Changelog:**
+            ${{ env.RELEASE_BODY }}
