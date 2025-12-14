@@ -17,6 +17,7 @@ pub async fn run_chapter_job(
     context: String,
 ) {
     let total = pages.len();
+    let job_id = base_url.clone();
 
     {
         state
@@ -29,17 +30,10 @@ pub async fn run_chapter_job(
     state.active_jobs.fetch_add(1, Ordering::Relaxed);
     tracing::info!("[Job] Started for {} ({} pages)", context, total);
 
-    // Shared atomic counter for tracking completed pages across threads
     let completed_counter = Arc::new(AtomicUsize::new(0));
-
-    // Mutex to ensure only one thread performs the file-save I/O at a time
     let save_lock = Arc::new(Mutex::new(()));
-
-    // Create a stream from the pages
     let stream = futures::stream::iter(pages.into_iter());
 
-    // Process up to 6 pages concurrently
-    // "Buffer Unordered" or "For Each Concurrent" automatically fills slots as they free up.
     stream
         .for_each_concurrent(6, |url| {
             let state = state.clone();
@@ -50,23 +44,19 @@ pub async fn run_chapter_job(
             let completed_counter = completed_counter.clone();
             let save_lock = save_lock.clone();
 
+            let page_id = url.split('/').last().unwrap_or("unknown").to_string();
+
             async move {
                 let cache_key = crate::logic::get_cache_key(&url);
-
-                // 1. Check Cache
                 let exists = { state.cache.read().expect("lock").contains_key(&cache_key) };
-
                 if exists {
-                    tracing::info!("[Job] Skip (Cached): {url}");
+                    tracing::info!("[Page {page_id}] Skip (Cached)");
                 } else {
-                    // 2. Fetch & Process (Network + OCR)
-                    // This is the heavy lifting that now happens in parallel
+                    tracing::info!("[Page {page_id}] Starting fetch_and_process (Async)...");
+
                     match crate::logic::fetch_and_process(&url, user, pass).await {
                         Ok(res) => {
-                            tracing::info!("[Job] Processed: {url}");
-                            // Write result to in-memory cache
-                            let mut w = state.cache.write().expect("lock");
-                            w.insert(
+                            state.cache.write().expect("lock").insert(
                                 cache_key,
                                 crate::state::CacheEntry {
                                     context: context.clone(),
@@ -75,12 +65,11 @@ pub async fn run_chapter_job(
                             );
                         }
                         Err(err) => {
-                            tracing::warn!("[Job] Failed: {url} (Error: {err:?})");
+                            tracing::warn!("[Page {page_id}] Failed: {err:?}");
                         }
                     }
                 }
 
-                // 3. Update Progress
                 let current = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
 
                 {
@@ -94,9 +83,6 @@ pub async fn run_chapter_job(
                     }
                 }
 
-                // 4. Periodic Save (Thread-Safe)
-                // We use try_lock() to skip saving if another thread is already doing it,
-                // preventing I/O pile-up.
                 if current % 5 == 0 {
                     if let Ok(_guard) = save_lock.try_lock() {
                         state.save_cache();
@@ -106,8 +92,10 @@ pub async fn run_chapter_job(
         })
         .await;
 
-    // Final Save to ensure everything is persisted
+    // Final Save
+    tracing::info!("[Job {job_id}] Final save...");
     state.save_cache();
+    tracing::info!("[Job {job_id}] Final save complete.");
 
     state.active_jobs.fetch_sub(1, Ordering::Relaxed);
 
@@ -119,5 +107,5 @@ pub async fn run_chapter_job(
             .remove(&base_url);
     }
 
-    tracing::info!("[Job] Finished for {}", context);
+    tracing::info!("[Job {job_id}] Finished for {}", context);
 }

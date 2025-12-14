@@ -1049,9 +1049,9 @@ dependencies = [
 
 [[package]]
 name = "chrome_lens_ocr"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f9f8d63431e6073efe1e3d3209d16c10f59503e4e5a74e5be0d34d25e96804d"
+checksum = "34ecf5d2bf09684c9530483a27ee99840b538ac9011410d917290eb05632de5c"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1140,9 +1140,9 @@ dependencies = [
 
 [[package]]
 name = "cmake"
-version = "0.1.54"
+version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7caa3f9de89ddbe2c607f4101924c5abec803763ae9534e4f4d7d8f84aa81f0"
+checksum = "b042e5d8a74ae91bb0961acd039822472ec99f8ab0948cbf6d1369588f8be586"
 dependencies = [
  "cc",
 ]

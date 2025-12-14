@@ -57,7 +57,8 @@ pub async fn ocr_handler(
         cache_key
     );
 
-    let result = logic::fetch_and_process(&params.url, params.user, params.pass).await;
+    let result =
+        logic::fetch_and_process(&params.url, params.user.clone(), params.pass.clone()).await;
 
     match result {
         Ok(data) => {
@@ -99,11 +100,11 @@ pub async fn ocr_handler(
 
 #[derive(Deserialize)]
 pub struct JobRequest {
-    base_url: String,
-    user: Option<String>,
-    pass: Option<String>,
-    context: String,
-    pages: Option<Vec<String>>,
+    pub base_url: String,
+    pub user: Option<String>,
+    pub pass: Option<String>,
+    pub context: String,
+    pub pages: Option<Vec<String>>,
 }
 
 pub async fn is_chapter_preprocessed_handler(
@@ -116,33 +117,64 @@ pub async fn is_chapter_preprocessed_handler(
             .read()
             .expect("lock poisoned")
             .get(&req.base_url)
-            .cloned() // Copy the JobProgress struct (current, total)
+            .cloned()
     };
 
     if let Some(p) = progress {
         return Json(serde_json::json!({
             "status": "processing",
-            "progress": p.current, // <-- Pass these to frontend
-            "total": p.total       // <-- Pass these to frontend
+            "progress": p.current,
+            "total": p.total
         }));
     }
 
-    let first_page_url = format!("{}0", req.base_url);
-    let cache_key = logic::get_cache_key(&first_page_url);
+    let chapter_base_path = logic::get_cache_key(&req.base_url);
 
-    let is_cached = {
-        state
-            .cache
-            .read()
-            .expect("lock poisoned")
-            .contains_key(&cache_key)
+    let total = state
+        .chapter_pages_map
+        .read()
+        .expect("pages map lock poisoned")
+        .get(&chapter_base_path)
+        .cloned();
+
+    let total = match total {
+        Some(total) => total,
+        None => {
+            match logic::resolve_total_pages_from_graphql(&req.base_url, req.user, req.pass).await {
+                Ok(total) => {
+                    state
+                        .chapter_pages_map
+                        .write()
+                        .expect("lock")
+                        .insert(chapter_base_path.clone(), total);
+                    state.save_cache();
+                    total
+                }
+                Err(e) => {
+                    warn!(
+                        "is_chapter_preprocessed_handler: Failed GraphQL fallback: {}",
+                        e
+                    );
+                    return Json(serde_json::json!({ "status": "idle" }));
+                }
+            }
+        }
     };
 
-    if is_cached {
-        Json(serde_json::json!({ "status": "processed" }))
-    } else {
-        Json(serde_json::json!({ "status": "idle" }))
+    let mut cached_count = 0;
+    for key in state.cache.read().expect("cache lock poisoned").keys() {
+        if key.starts_with(&chapter_base_path) {
+            cached_count += 1;
+        }
     }
+    if cached_count >= total {
+        return Json(
+            serde_json::json!({ "status": "processed", "cached_count": cached_count, "total_expected": total }),
+        );
+    }
+    return Json(
+        serde_json::json!({ "status": "idle", "cached_count": cached_count, "total_expected": total }),
+    );
 }
 
 pub async fn preprocess_handler(
@@ -213,7 +245,7 @@ pub async fn import_cache_handler(
                 added += 1;
             }
         }
-    } // Drop lock
+    }
 
     if added > 0 {
         state.save_cache();
