@@ -35,7 +35,6 @@ use jni::{
 };
 use lazy_static::lazy_static;
 use reqwest::Client;
-use rust_embed::RustEmbed;
 use tar::Archive;
 use tokio::{fs as tokio_fs, net::TcpListener};
 use tokio_tungstenite::{
@@ -125,10 +124,6 @@ type JniCreateJavaVM = unsafe extern "system" fn(
     penv: *mut *mut c_void,
     args: *mut c_void,
 ) -> jint;
-
-unsafe extern "C" {
-    fn mallopt(param: i32, value: i32) -> i32;
-}
 
 struct MangatanApp {
     server_ready: Arc<AtomicBool>,
@@ -482,7 +477,7 @@ async fn proxy_request(
                 .body(Body::from_stream(resp.bytes_stream()))
                 .unwrap()
         }
-        Err(err) => Response::builder()
+        Err(_err) => Response::builder()
             .status(StatusCode::BAD_GATEWAY)
             .body(Body::empty())
             .unwrap(),
@@ -492,7 +487,7 @@ async fn proxy_request(
 fn axum_to_tungstenite(msg: Message) -> Option<TungsteniteMessage> {
     match msg {
         Message::Text(t) => Some(TungsteniteMessage::Text(t.as_str().into())),
-        Message::Binary(b) => Some(TungsteniteMessage::Binary(b.to_vec())),
+        Message::Binary(b) => Some(TungsteniteMessage::Binary(b)),
         Message::Ping(p) => Some(TungsteniteMessage::Ping(p)),
         Message::Pong(p) => Some(TungsteniteMessage::Pong(p)),
         Message::Close(c) => {
