@@ -27,6 +27,8 @@ use axum::{
 };
 use eframe::egui;
 use futures::{SinkExt, StreamExt};
+use jni::objects::JString;
+use jni::sys::jobject;
 use jni::{
     JavaVM,
     objects::{JObject, JValue},
@@ -207,6 +209,8 @@ fn android_main(app: AndroidApp) {
     redirect_stdout_to_gui();
 
     info!("Starting Mangatan...");
+
+    check_and_request_permissions(&app);
 
     let app_bg = app.clone();
     let files_dir = app.internal_data_path().expect("Failed to get data path");
@@ -866,4 +870,153 @@ fn find_file_in_dir(dir: &Path, filename: &str) -> Option<PathBuf> {
 struct AppState {
     client: Client,
     webui_dir: PathBuf,
+}
+
+fn get_package_name(env: &mut jni::JNIEnv, context: &JObject) -> jni::errors::Result<String> {
+    let package_jstr_obj = env
+        .call_method(context, "getPackageName", "()Ljava/lang/String;", &[])?
+        .l()?;
+
+    let package_jstr: JString = package_jstr_obj.into();
+
+    let rust_string: String = env.get_string(&package_jstr)?.into();
+
+    Ok(rust_string)
+}
+
+fn check_and_request_permissions(app: &AndroidApp) {
+    // 1. Initialize JNI Environment and Context
+    let vm = unsafe { JavaVM::from_raw(app.vm_as_ptr() as *mut jni::sys::JavaVM).unwrap() };
+    let mut env = vm.attach_current_thread().unwrap();
+
+    // The AndroidApp context is the activity (jobject) itself.
+    let context = unsafe { JObject::from_raw(app.activity_as_ptr() as jobject) };
+
+    // Get the package name using JNI
+    let pkg_name = match get_package_name(&mut env, &context) {
+        Ok(name) => name,
+        Err(e) => {
+            info!("Failed to get package name via JNI: {:?}", e);
+            // Fallback to a common package structure or hardcoded value if JNI fails
+            "com.mangatan.app".to_string()
+        }
+    };
+    info!("Using Package Name: {}", pkg_name);
+
+    // 2. Get Android SDK Version
+    let version_cls = env.find_class("android/os/Build$VERSION").unwrap();
+    let sdk_int = env
+        .get_static_field(version_cls, "SDK_INT", "I")
+        .unwrap()
+        .i()
+        .unwrap();
+
+    info!("Detected Android SDK: {}", sdk_int);
+
+    if sdk_int >= 30 {
+        // --- Android 11+ (SDK 30+) Logic: Manage All Files ---
+        let env_cls = env.find_class("android/os/Environment").unwrap();
+        let is_manager = env
+            .call_static_method(env_cls, "isExternalStorageManager", "()Z", &[])
+            .unwrap()
+            .z()
+            .unwrap();
+
+        if !is_manager {
+            info!("Requesting Android 11+ All Files Access...");
+            let uri_cls = env.find_class("android/net/Uri").unwrap();
+
+            // Construct "package:com.your.package"
+            let uri_str = env.new_string(format!("package:{}", pkg_name)).unwrap();
+
+            let uri = env
+                .call_static_method(
+                    uri_cls,
+                    "parse",
+                    "(Ljava/lang/String;)Landroid/net/Uri;",
+                    &[JValue::Object(&uri_str)],
+                )
+                .unwrap()
+                .l()
+                .unwrap();
+
+            let intent_cls = env.find_class("android/content/Intent").unwrap();
+            let action = env
+                .new_string("android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION")
+                .unwrap();
+
+            let intent = env
+                .new_object(
+                    intent_cls,
+                    "(Ljava/lang/String;Landroid/net/Uri;)V",
+                    &[JValue::Object(&action), JValue::Object(&uri)],
+                )
+                .unwrap();
+
+            let flags = 0x10000000; // FLAG_ACTIVITY_NEW_TASK
+            let _ = env.call_method(
+                &intent,
+                "addFlags",
+                "(I)Landroid/content/Intent;",
+                &[JValue::Int(flags)],
+            );
+
+            let _ = env.call_method(
+                &context,
+                "startActivity",
+                "(Landroid/content/Intent;)V",
+                &[JValue::Object(&intent)],
+            );
+        }
+    } else {
+        // --- Android 8.0 - 10 (SDK 26-29) Logic: Standard Permissions ---
+
+        let perm_string = env
+            .new_string("android.permission.WRITE_EXTERNAL_STORAGE")
+            .unwrap();
+
+        // Check if already granted
+        let check_res = env
+            .call_method(
+                &context,
+                "checkSelfPermission",
+                "(Ljava/lang/String;)I",
+                &[JValue::Object(&perm_string)],
+            )
+            .unwrap()
+            .i()
+            .unwrap();
+
+        if check_res != 0 {
+            info!("Requesting Legacy Storage Permissions (SDK < 30)...");
+
+            let string_cls = env.find_class("java/lang/String").unwrap();
+
+            // Create String[] { "android.permission.WRITE_EXTERNAL_STORAGE", "android.permission.READ_EXTERNAL_STORAGE" }
+            let perms_array = env
+                .new_object_array(2, string_cls, JObject::null())
+                .unwrap();
+            let write_perm = env
+                .new_string("android.permission.WRITE_EXTERNAL_STORAGE")
+                .unwrap();
+            let read_perm = env
+                .new_string("android.permission.READ_EXTERNAL_STORAGE")
+                .unwrap();
+
+            env.set_object_array_element(&perms_array, 0, write_perm)
+                .unwrap();
+            env.set_object_array_element(&perms_array, 1, read_perm)
+                .unwrap();
+
+            // Call activity.requestPermissions(String[], int)
+            let _ = env.call_method(
+                &context,
+                "requestPermissions",
+                "([Ljava/lang/String;I)V",
+                &[JValue::Object(&perms_array), JValue::Int(101)],
+            );
+        } else {
+            info!("Legacy Storage Permissions already granted.");
+        }
+    }
 }
