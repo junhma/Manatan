@@ -136,6 +136,28 @@ download_natives:
 	rm -rf temp_natives
 	@echo "Natives ready at bin/mangatan/resources/natives.zip"
 
+.PHONY: download_android_natives
+download_android_natives:
+	@echo "Downloading Android Natives (JogAmp)..."
+	mkdir -p bin/mangatan_android/assets
+	rm -f bin/mangatan_android/assets/natives.tar
+	rm -rf temp_android_natives
+	
+	@echo "Downloading JogAmp..."
+	curl -L "https://github.com/KolbyML/java_assets/releases/download/1/jogamp-all-platforms.7z" -o jogamp_android.7z
+	
+	@echo "Extracting libraries (android-aarch64)..."
+	# CHANGE 1: Use android-aarch64 instead of linux-aarch64
+	7z x jogamp_android.7z -otemp_android_natives "jogamp-all-platforms/lib/android-aarch64"
+	
+	@echo "Packaging natives.tar..."
+	# CHANGE 2: Update path here too, and use $(CURDIR) to fix the "open failed" error
+	cd temp_android_natives/jogamp-all-platforms/lib/android-aarch64 && tar -cf "$(CURDIR)/bin/mangatan_android/assets/natives.tar" .
+	
+	@echo "Cleanup..."
+	rm jogamp_android.7z
+	rm -rf temp_android_natives
+
 .PHONY: setup-depends
 setup-depends: desktop_webui download_jar download_natives
 
@@ -148,7 +170,7 @@ dev-embedded: setup-depends bundle_jre
 	cargo run --release -p mangatan --features embed-jre
 
 .PHONY: dev-android
-dev-android: android_webui download_android_jar download_android_jre
+dev-android: android_webui download_android_jar download_android_jre download_android_natives
 	cd bin/mangatan_android && cargo apk build
 	adb install -r target/debug/apk/mangatan_android.apk
 	adb shell am start -n com.mangatan.app/android.app.NativeActivity
