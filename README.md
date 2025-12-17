@@ -77,7 +77,7 @@ We have detailed build instructions for each platform. Please refer to the speci
 
 1.  **Clone the repository:**
     ```bash
-    git clone --recursive [https://github.com/KolbyML/Mangatan.git](https://github.com/KolbyML/Mangatan.git)
+    git clone --recursive https://github.com/KolbyML/Mangatan
     cd Mangatan
     ```
 
@@ -86,48 +86,6 @@ We have detailed build instructions for each platform. Please refer to the speci
     ```bash
     make dev-embedded
     ```
-
-### Android APK Development
-
-```bash
-rustup target add aarch64-linux-android
-cargo install --git https://github.com/kolbyml/cargo-apk
-```
-
-Install Android Studio to get Android SDK https://developer.android.com/studio
-
-Mark sure you install
-- Android 11 SDK
-- NDK
-
-
-#### Log App
-
-```bash
-adb logcat RustJRE RustStdoutStderr '*:S'
-```
-
-#### Run App in debug mode (will reset your Mangatan data)
-
-```bash
-make dev-android
-```
-
-#### See local files
-
-```
-adb shell run-as com.mangatan.app ls -la files
-```
-
-#### Forward Ports so accessible on desktop
-```
-adb forward tcp:4567 tcp:4567
-```
-
-Remove the forwards
-```
-adb forward --remove-all
-```
 
 ## 📚 References and acknowledgements
 The following links, repos, companies and projects have been important in the development of this repo, we have learned a lot from them and want to thank and acknowledge them.

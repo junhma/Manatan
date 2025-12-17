@@ -120,3 +120,25 @@ cd bin/mangatan_android && cargo apk run
 * **Emulator:** If using an emulator, it likely uses x86_64 architecture. You must run `rustup target add x86_64-linux-android` and run with `--target x86_64-linux-android`.
 * **Signing:** `cargo apk run` automatically uses a debug keystore. You do **not** need to perform the "Dummy Keystore" steps from the CI (those are for creating a signed Release APK).
 * **NDK Errors:** If `cargo-apk` complains about the NDK, ensure `ANDROID_NDK_HOME` is set correctly to the *exact* folder version (e.g., `.../ndk/26.1.10909125`).
+
+#### Log App
+
+```bash
+adb logcat RustJRE RustStdoutStderr '*:S'
+```
+
+#### See local files
+
+```
+adb shell run-as com.mangatan.app ls -la files
+```
+
+#### Forward Ports so accessible on desktop
+```
+adb forward tcp:4567 tcp:4567
+```
+
+Remove the forwards
+```
+adb forward --remove-all
+```
