@@ -149,7 +149,6 @@ dev-embedded: setup-depends bundle_jre
 
 .PHONY: dev-android
 dev-android: android_webui download_android_jar download_android_jre
-	adb uninstall com.mangatan.app || true
 	cd bin/mangatan_android && cargo apk build
 	adb install -r target/debug/apk/mangatan_android.apk
 	adb shell am start -n com.mangatan.app/android.app.NativeActivity
