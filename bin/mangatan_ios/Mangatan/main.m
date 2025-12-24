@@ -75,11 +75,14 @@ int main(int argc, char * argv[]) {
     NSString *libPath = [bundlePath stringByAppendingPathComponent:@"lib"];
     NSString *jarPath = [bundlePath stringByAppendingPathComponent:@"jar/suwayomi-server.jar"];
     NSString *tmpDir = [docDir stringByAppendingPathComponent:@"tmp"];
+
+    NSString *localSourcePath = [docDir stringByAppendingPathComponent:@"local-source"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:localSourcePath withIntermediateDirectories:YES attributes:nil error:nil];
     
     [[NSFileManager defaultManager] createDirectoryAtPath:tmpDir withIntermediateDirectories:YES attributes:nil error:nil];
 
     JavaVMInitArgs vm_args;
-    JavaVMOption options[30];
+    JavaVMOption options[31];
     int optCount = 0;
 
     options[optCount++].optionString = strdup([[NSString stringWithFormat:@"-Djava.home=%@", libPath] UTF8String]);
@@ -92,6 +95,7 @@ int main(int argc, char * argv[]) {
     options[optCount++].optionString = "-Dos.version=5.15.0";
     options[optCount++].optionString = "-Dos.arch=aarch64";
     
+    options[optCount++].optionString = strdup([[NSString stringWithFormat:@"-Dsuwayomi.tachidesk.config.server.localSourcePath=%@", localSourcePath] UTF8String]);
     options[optCount++].optionString = "-Dsuwayomi.tachidesk.config.server.ip =\"127.0.0.1\"";
     options[optCount++].optionString = "-Dsuwayomi.tachidesk.config.server.initialOpenInBrowserEnabled=false";
     options[optCount++].optionString = "-Dsuwayomi.tachidesk.config.server.systemTrayEnabled=false";
