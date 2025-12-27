@@ -17,7 +17,7 @@ Traditional setups for reading manga with Japanese lookup (OCR) can be complicat
 ### 🖥️ Supported Platforms
 | Windows | Linux | macOS | Android | iOS |
 | :---: | :---: | :---: | :---: | :---: |
-| ✅ | ✅ | ✅ | ✅ | 🚧 (Coming Soon) |
+| ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ## 🚀 Getting Started
 
