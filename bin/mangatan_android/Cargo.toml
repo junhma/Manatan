@@ -20,6 +20,7 @@ package = "com.mangatan.app"
 build_targets = ["Arm64V8a", "ArmV7a"]
 assets = "assets"
 java_sources = "java"
+resources = "res"
 
 [package.metadata.android.sdk]
 min_sdk_version = 23
@@ -62,6 +63,8 @@ name = "android.permission.POST_NOTIFICATIONS"
 allow_native_heap_pointer_tagging = false
 request_legacy_external_storage = true
 has_code = true
+label = "Mangatan"
+icon = "@mipmap/ic_launcher"
 
 [[package.metadata.android.application.activity]]
 name = ".WebviewActivity"

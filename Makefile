@@ -109,6 +109,21 @@ android_webui: build_webui
 	mkdir -p bin/mangatan_android/assets
 	tar -cf bin/mangatan_android/assets/mangatan-webui.tar -C Mangatan-WebUI/build .
 
+# --- Android Icon Setup ---
+.PHONY: android_icon
+android_icon:
+	@echo "Setting up Android Icon..."
+	mkdir -p bin/mangatan_android/res/mipmap-xxxhdpi
+	mkdir -p bin/mangatan_android/res/mipmap-xxhdpi
+	mkdir -p bin/mangatan_android/res/mipmap-xhdpi
+	mkdir -p bin/mangatan_android/res/mipmap-hdpi
+	mkdir -p bin/mangatan_android/res/mipmap-mdpi
+	cp bin/mangatan_ios/Mangatan/Assets.xcassets/AppIcon.appiconset/mangatanlogo11.png bin/mangatan_android/res/mipmap-xxxhdpi/ic_launcher.png
+	cp bin/mangatan_ios/Mangatan/Assets.xcassets/AppIcon.appiconset/mangatanlogo11.png bin/mangatan_android/res/mipmap-xxhdpi/ic_launcher.png
+	cp bin/mangatan_ios/Mangatan/Assets.xcassets/AppIcon.appiconset/mangatanlogo11.png bin/mangatan_android/res/mipmap-xhdpi/ic_launcher.png
+	cp bin/mangatan_ios/Mangatan/Assets.xcassets/AppIcon.appiconset/mangatanlogo11.png bin/mangatan_android/res/mipmap-hdpi/ic_launcher.png
+	cp bin/mangatan_ios/Mangatan/Assets.xcassets/AppIcon.appiconset/mangatanlogo11.png bin/mangatan_android/res/mipmap-mdpi/ic_launcher.png
+
 .PHONY: ios_webui
 ios_webui: build_webui
 	@echo "Packaging WebUI for iOS..."
@@ -209,11 +224,11 @@ dev-embedded: setup-depends bundle_jre
 	cargo run --release -p mangatan --features embed-jre
 
 .PHONY: dev-android
-dev-android: android_webui download_android_jar download_android_jre download_android_natives
+dev-android: android_webui download_android_jar download_android_jre download_android_natives android_icon
 	cd bin/mangatan_android && cargo apk2 run
 
 .PHONY: dev-android-native
-dev-android-native: android_webui download_android_jar download_android_jre download_android_natives
+dev-android-native: android_webui download_android_jar download_android_jre download_android_natives android_icon
 	cd bin/mangatan_android && cargo apk2 run --features native_webview
 
 .PHONY: jlink

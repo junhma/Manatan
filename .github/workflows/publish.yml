@@ -407,19 +407,7 @@ jobs:
           make android_webui
           make download_android_jar
           make download_android_jre
-
-      - name: Setup App Icon
-        run: |
-          mkdir -p bin/mangatan_android/res/mipmap-xxxhdpi
-          mkdir -p bin/mangatan_android/res/mipmap-xxhdpi
-          mkdir -p bin/mangatan_android/res/mipmap-xhdpi
-          mkdir -p bin/mangatan_android/res/mipmap-hdpi
-          mkdir -p bin/mangatan_android/res/mipmap-mdpi
-          cp bin/mangatan/resources/faviconlogo.png bin/mangatan_android/res/mipmap-xxxhdpi/ic_launcher.png
-          cp bin/mangatan/resources/faviconlogo.png bin/mangatan_android/res/mipmap-xxhdpi/ic_launcher.png
-          cp bin/mangatan/resources/faviconlogo.png bin/mangatan_android/res/mipmap-xhdpi/ic_launcher.png
-          cp bin/mangatan/resources/faviconlogo.png bin/mangatan_android/res/mipmap-hdpi/ic_launcher.png
-          cp bin/mangatan/resources/faviconlogo.png bin/mangatan_android/res/mipmap-mdpi/ic_launcher.png
+          make android_icon
 
       - name: Configure Dummy Keystore
         working-directory: bin/mangatan_android
