@@ -202,13 +202,14 @@ bin/mangatan_android/assets/Suwayomi-Server.jar:
 download_android_jar: bin/mangatan_android/assets/Suwayomi-Server.jar
 
 # 3. Android JRE
-bin/mangatan_android/assets/jre.tar:
-	@echo "Downloading Android JRE..."
+bin/mangatan_android/assets/jre.tar.gz:
+	@echo "Downloading and Compressing Android JRE..."
 	mkdir -p bin/mangatan_android/assets
-	curl -L "https://github.com/KolbyML/java_assets/releases/download/1/android_jdk_21.tar" -o bin/mangatan_android/assets/jre.tar
+	# Curl downloads to stdout (-), pipes to gzip, which writes to the file
+	curl -L "https://github.com/KolbyML/java_assets/releases/download/1/android_jre_21.tar.gz" -o bin/mangatan_android/assets/jre.tar.gz
 
 .PHONY: download_android_jre
-download_android_jre: bin/mangatan_android/assets/jre.tar
+download_android_jre: bin/mangatan_android/assets/jre.tar.gz
 
 # -----------------------------------
 

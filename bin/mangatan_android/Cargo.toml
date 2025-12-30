@@ -17,7 +17,7 @@ native_webview = []
 
 [package.metadata.android]
 package = "com.mangatan.app"
-build_targets = ["Arm64V8a", "ArmV7a"]
+build_targets = ["Arm64V8a"]
 assets = "assets"
 java_sources = "java"
 resources = "res"
@@ -132,3 +132,4 @@ tracing = "0.1"
 tracing-log = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 winit = "0.30"
+flate2 = { version = "1.0", default-features = false, features = ["rust_backend"] }
