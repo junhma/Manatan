@@ -72,6 +72,7 @@ has_code = true
 has_fragile_user_data = true
 label = "Mangatan"
 icon = "@mipmap/ic_launcher"
+uses_cleartext_traffic = true
 
 [[package.metadata.android.application.activity]]
 name = ".WebviewActivity"
