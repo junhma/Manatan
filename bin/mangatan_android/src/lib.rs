@@ -952,6 +952,92 @@ fn start_background_services(app: AndroidApp, files_dir: PathBuf) {
                 .replace("{}", &tachidesk_data.to_string_lossy()),
         );
 
+        let config_marker = files_dir.join(".config_local_source_v1");
+
+        // Check if this is an update by looking for existing server configuration
+        // Note: tachidesk_data is defined earlier in this function
+        let server_conf = tachidesk_data.join("server.conf");
+        let is_existing_user = server_conf.exists();
+
+        if !config_marker.exists() {
+            info!("Configuration check: Existing User = {}", is_existing_user);
+
+            // 1. Attach to Android VM to resolve External Storage Path
+            let android_vm = JavaVM::from_raw(app.vm_as_ptr() as *mut jni::sys::JavaVM).unwrap();
+
+            match android_vm.attach_current_thread() {
+                Ok(mut android_env) => {
+                    let env_cls_res = android_env.find_class("android/os/Environment");
+                    if let Ok(env_cls) = env_cls_res {
+                        let dir_res = android_env.call_static_method(
+                            env_cls,
+                            "getExternalStorageDirectory",
+                            "()Ljava/io/File;",
+                            &[],
+                        );
+
+                        // FIXED: Use .l() to extract JObject safely from JValue
+                        if let Ok(file_obj) = dir_res.and_then(|v| v.l()) {
+                            let path_res = android_env.call_method(
+                                &file_obj,
+                                "getAbsolutePath",
+                                "()Ljava/lang/String;",
+                                &[],
+                            );
+
+                            // FIXED: Use .l() to extract JObject safely from JValue
+                            if let Ok(path_jstr_obj) = path_res.and_then(|v| v.l()) {
+                                // FIXED: Convert owned JObject to JString using .into()
+                                let path_jstr: JString = path_jstr_obj.into();
+
+                                // Get the Rust String
+                                if let Ok(path_rust_str) = android_env.get_string(&path_jstr) {
+                                    let path_rust: String = path_rust_str.into();
+
+                                    // 2. Construct the target path
+                                    let target_path =
+                                        format!("{}/Mangatan/local-sources", path_rust);
+
+                                    // 3. Always create the directory
+                                    info!(
+                                        "Ensuring local source directory exists: {}",
+                                        target_path
+                                    );
+                                    let _ = std::fs::create_dir_all(&target_path);
+
+                                    // 4. Only set the flag if it is a FRESH install
+                                    if !is_existing_user {
+                                        info!(
+                                            "Fresh install detected: Setting localSourcePath flag."
+                                        );
+                                        options_vec.push(format!(
+                                            "-Dsuwayomi.tachidesk.config.server.localSourcePath={}",
+                                            target_path
+                                        ));
+                                    } else {
+                                        info!(
+                                            "Legacy update detected: NOT setting localSourcePath flag."
+                                        );
+                                    }
+
+                                    // 5. Create the marker
+                                    if let Err(e) = std::fs::write(&config_marker, "configured") {
+                                        error!("Failed to write config marker: {:?}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => error!(
+                    "Failed to attach to Android VM for path resolution: {:?}",
+                    e
+                ),
+            }
+        } else {
+            info!("Config marker exists. Skipping localSourcePath configuration.");
+        }
+
         let mut jni_options: Vec<jni::sys::JavaVMOption> = options_vec
             .iter()
             .map(|s| {

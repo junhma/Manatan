@@ -3625,6 +3625,7 @@ dependencies = [
  "openssl",
  "reqwest",
  "serde",
+ "serde_json",
  "tar",
  "tokio",
  "tokio-tungstenite 0.21.0",
